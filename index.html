@@ -149,6 +149,7 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
   .meal-grid{grid-template-columns:repeat(3,1fr);}
   .summary-cards{grid-template-columns:1fr 1fr;}
   .form-row,.form-row.three{grid-template-columns:1fr;}
+  #reportDownloadRow{grid-template-columns:1fr 1fr!important;}
 }
 </style>
 </head>
@@ -354,35 +355,39 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
         👤 আপনি শুধু আপনার নিজের entry দেখতে পাচ্ছেন। সব entry দেখতে Admin এর সাথে যোগাযোগ করুন।
       </div>
 
-      <div class="form-card" style="padding:20px 24px;" id="reportFiltersCard">
-        <div class="report-filters">
-          <div class="form-group" id="filterUserGroup">
+      <div class="form-card" style="padding:28px 28px 22px;" id="reportFiltersCard">
+        <div style="font-size:15px;font-weight:700;color:var(--green);margin-bottom:20px;display:flex;align-items:center;gap:8px;">📋 Report Download</div>
+        <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:16px;" id="reportDownloadRow">
+          <div class="form-group" id="filterUserGroup" style="margin-bottom:0;">
             <label>Name / Person</label>
             <select id="filterUser"><option value="">All Staff</option></select>
           </div>
-          <div class="form-group">
-            <label>PIN</label>
-            <select id="filterPin"><option value="">All PINs</option></select>
-          </div>
-          <div class="form-group">
-            <label>From</label>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>From Date</label>
             <input type="date" id="filterFrom"/>
           </div>
-          <div class="form-group">
-            <label>To</label>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>To Date</label>
             <input type="date" id="filterTo"/>
           </div>
-          <button class="btn-filter" onclick="renderReport()">🔍 Filter</button>
-          <button class="btn-filter" style="background:var(--orange);" onclick="resetToToday()">📅 Today</button>
-          <button class="btn-filter" style="background:#6c757d;" onclick="clearFilters()">🗑️ Clear</button>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Report Type</label>
+            <select id="reportType">
+              <option value="excel">📊 Excel</option>
+              <option value="pdf">📄 PDF</option>
+            </select>
+          </div>
         </div>
-      </div>
+        <!-- PIN filter hidden but functional -->
+        <select id="filterPin" style="display:none;"><option value="">All PINs</option></select>
 
-      <div class="action-row">
-        <button class="btn-action" onclick="exportExcel()">📊 Download Excel</button>
-        <button class="btn-action" onclick="exportPDF()">📄 Download PDF</button>
-        <button class="btn-action" onclick="doPrint()">🖨️ Print</button>
-        <button class="btn-action" onclick="loadData()">🔄 Refresh</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+          <button class="btn-submit" style="width:auto;padding:12px 28px;font-size:15px;" onclick="downloadReport()">⬇️ Report Download</button>
+          <button class="btn-filter" style="background:var(--orange);padding:12px 18px;" onclick="resetToToday()">📅 Today</button>
+          <button class="btn-filter" style="background:#6c757d;padding:12px 18px;" onclick="clearFilters()">🗑️ Clear</button>
+          <button class="btn-filter" style="background:var(--green2);padding:12px 18px;" onclick="loadData()">🔄 Refresh</button>
+          <button class="btn-filter" style="background:#555;padding:12px 18px;" onclick="doPrint()">🖨️ Print</button>
+        </div>
       </div>
 
       <div class="summary-cards" id="summaryCards"></div>
@@ -868,8 +873,12 @@ function setReportDefaultDates(){
 document.addEventListener('DOMContentLoaded', ()=>{
   ['filterFrom','filterTo'].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.addEventListener('change', ()=>{ el.dataset.userSet = '1'; });
+    if(el) el.addEventListener('change', ()=>{ el.dataset.userSet = '1'; renderReport(); });
   });
+  const userSel = document.getElementById('filterUser');
+  if(userSel) userSel.addEventListener('change', renderReport);
+  const pinSel = document.getElementById('filterPin');
+  if(pinSel) pinSel.addEventListener('change', renderReport);
 });
 
 // REPORT
@@ -992,7 +1001,14 @@ function renderUsers(){
     </div>`).join('');
 }
 
-// EXCEL EXPORT
+// DOWNLOAD REPORT — single button handles Excel + PDF
+function downloadReport(){
+  const type = document.getElementById('reportType').value;
+  // First render with current filters so getFiltered() is up to date
+  renderReport();
+  if(type === 'excel') exportExcel();
+  else exportPDF();
+}
 function exportExcel(){
   const data=getFiltered();
   if(!data.length){toast('No data to export','error');return;}
