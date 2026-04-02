@@ -616,13 +616,13 @@ function showPage(name,el){
   if(name==='users')renderUsers();
 }
 
-// FORMAT TIME — converts "HH:MM:SS" or any time string to readable format
+// FORMAT TIME — converts various time formats to readable HH:MM AM/PM
 function formatTime(raw){
   if(!raw) return '';
   const s = String(raw).trim();
   // Already formatted like "10:30 AM"
   if(/\d{1,2}:\d{2}\s?(AM|PM)/i.test(s)) return s;
-  // HH:MM or HH:MM:SS
+  // Pure HH:MM or HH:MM:SS (no date prefix)
   if(/^\d{1,2}:\d{2}/.test(s)){
     const parts = s.split(':');
     let h = parseInt(parts[0]);
@@ -631,7 +631,18 @@ function formatTime(raw){
     h = h % 12 || 12;
     return `${h}:${m} ${ampm}`;
   }
-  return s;
+  // Google Sheets sometimes sends a full date string like "Sat Dec 30 1899 23:24:00 GMT+0553"
+  // Extract HH:MM from it
+  const timeMatch = s.match(/(\d{1,2}):(\d{2}):\d{2}/);
+  if(timeMatch){
+    let h = parseInt(timeMatch[1]);
+    const m = timeMatch[2];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ampm}`;
+  }
+  // Unrecognizable — return empty
+  return '';
 }
 
 // COUNTER
@@ -839,13 +850,17 @@ function getFiltered(){
   const pin=document.getElementById('filterPin').value;
   const from=document.getElementById('filterFrom').value;
   const to=document.getElementById('filterTo').value;
-  const usr=isAdmin ? document.getElementById('filterUser').value : '';
+  const usr=isAdmin ? document.getElementById('filterUser').value.trim() : '';
   return base.filter(r=>{
     if(pin&&r.pin!==pin)return false;
     const rd = r.rawDate ? String(r.rawDate).trim() : '';
     if(from&&rd<from)return false;
     if(to&&rd>to)return false;
-    if(usr&&r.postedBy!==usr)return false;
+    // Match against postedBy OR fullName OR username (case-insensitive)
+    if(usr){
+      const match = (r.postedBy||'').trim()===usr || (r.username||'').trim()===usr;
+      if(!match) return false;
+    }
     return true;
   });
 }
@@ -864,19 +879,15 @@ function resetToToday(){
   const today = getTodayBD();
   const fromEl = document.getElementById('filterFrom');
   const toEl   = document.getElementById('filterTo');
-  if(fromEl){ fromEl.value = today; delete fromEl.dataset.userSet; }
-  if(toEl)  { toEl.value   = today; delete toEl.dataset.userSet; }
+  if(fromEl){ fromEl.value = today; fromEl.dataset.userSet='1'; }
+  if(toEl)  { toEl.value   = today; toEl.dataset.userSet='1'; }
   renderReport();
 }
 
-// Set today as default date range in report filters (for all users)
+// Set today as default ONLY on first login (not on every renderReport call)
 function setReportDefaultDates(){
-  if(!me) return;
-  const today = getTodayBD();
-  const fromEl = document.getElementById('filterFrom');
-  const toEl   = document.getElementById('filterTo');
-  if(fromEl && !fromEl.dataset.userSet) fromEl.value = today;
-  if(toEl   && !toEl.dataset.userSet)   toEl.value   = today;
+  // Do nothing — dates start blank so all records show by default
+  // User must click Today or manually pick dates to filter by date
 }
 
 // Track if user manually changed date filters
@@ -1036,7 +1047,7 @@ function exportExcel(){
 
   // Detail sheet
   const header=['#','Date','Time','Name','PIN','Breakfast','M.Snacks','Lunch','E.Snacks','Dinner','Total','Remarks'];
-  const rows=data.map((r,i)=>[i+1,r.date,r.time||'',r.postedBy||'',r.pin||'',r.breakfast||0,r.msnacks||0,r.lunch||0,r.esnacks||0,r.dinner||0,r.total||0,r.remarks||'']);
+  const rows=data.map((r,i)=>[i+1, r.date||'', formatTime(r.time)||'', r.postedBy||'', r.pin||'', r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0, r.remarks||'']);
   const ws=XLSX.utils.aoa_to_sheet([
     ['BLC Sreemangal — Meal Report'],
     [`Person: ${personLabel}  |  Date: ${bdDate}`],
@@ -1083,14 +1094,21 @@ function exportPDF(){
 
   doc.autoTable({
     startY:34,
-    head:[['#','Date','Time','Name','PIN','Bfast','M.Snk','Lunch','E.Snk','Dinner','Total','Remarks']],
+    head:[['#','Date','Name','PIN','Bfast','M.Snk','Lunch','E.Snk','Dinner','Total','Remarks']],
     body:[
-      ...data.map((r,i)=>[i+1,r.date||'',r.time||'',r.postedBy||'',r.pin||'',r.breakfast||0,r.msnacks||0,r.lunch||0,r.esnacks||0,r.dinner||0,r.total||0,r.remarks||'']),
-      ['','','','','TOTAL',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total,'']
+      ...data.map((r,i)=>[
+        i+1,
+        (r.date||'') + (r.time ? '\n'+formatTime(r.time) : ''),
+        r.postedBy||'',
+        r.pin||'',
+        r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0,
+        r.remarks||''
+      ]),
+      ['','','TOTAL','',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total,'']
     ],
     headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:9},
     bodyStyles:{fontSize:8},
-    columnStyles:{0:{cellWidth:8},1:{cellWidth:22},2:{cellWidth:18},3:{cellWidth:35},4:{cellWidth:14},5:{cellWidth:14},6:{cellWidth:14},7:{cellWidth:14},8:{cellWidth:14},9:{cellWidth:14},10:{cellWidth:14},11:{cellWidth:28}},
+    columnStyles:{0:{cellWidth:8},1:{cellWidth:26},2:{cellWidth:38},3:{cellWidth:16},4:{cellWidth:13},5:{cellWidth:13},6:{cellWidth:13},7:{cellWidth:13},8:{cellWidth:13},9:{cellWidth:13},10:{cellWidth:28}},
     alternateRowStyles:{fillColor:[216,243,220]},
     didParseCell:function(d){
       if(d.row.index===data.length){
