@@ -806,20 +806,30 @@ function getMyRecords(){
 // FILTERS
 function populateFilters(){
   const isAdmin = me && me.role === 'admin';
-  // For admin: show all records in dropdowns; for staff: only their own
   const base = isAdmin ? records : getMyRecords();
   const pinSel=document.getElementById('filterPin');
   const usrSel=document.getElementById('filterUser');
+
+  // Save current selections before rebuilding
+  const savedPin = pinSel.value;
+  const savedUsr = usrSel.value;
+
   const pins=[...new Set(base.map(r=>r.pin).filter(Boolean))];
   const staff=[...new Set(records.map(r=>r.postedBy).filter(Boolean))];
+
   pinSel.innerHTML='<option value="">All PINs</option>'+pins.map(p=>`<option>${p}</option>`).join('');
-  // Staff sees only their own name; Admin sees all
+
   if(isAdmin){
-    usrSel.innerHTML='<option value="">All Staff</option>'+staff.map(s=>`<option>${s}</option>`).join('');
+    usrSel.innerHTML='<option value="">All Staff</option>'+staff.map(s=>`<option value="${s}">${s}</option>`).join('');
+    // Restore selection
+    usrSel.value = savedUsr;
   } else {
     usrSel.innerHTML=`<option value="">${me.fullName} (You)</option>`;
     usrSel.value='';
   }
+  // Restore pin selection
+  pinSel.value = savedPin;
+
   document.getElementById('filterUserGroup').style.display = isAdmin ? '' : 'none';
 }
 
@@ -845,8 +855,8 @@ function clearFilters(){
   const toEl=document.getElementById('filterTo');
   document.getElementById('filterPin').value='';
   document.getElementById('filterUser').value='';
-  if(fromEl){fromEl.value='';delete fromEl.dataset.userSet;}
-  if(toEl){toEl.value='';delete toEl.dataset.userSet;}
+  if(fromEl){fromEl.value='';fromEl.dataset.userSet='1';} // mark as user-set so renderReport won't reset to today
+  if(toEl){toEl.value='';toEl.dataset.userSet='1';}
   renderReport();
 }
 
@@ -884,6 +894,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 // REPORT
 function renderReport(){
   if(!me) return;
+  // Set default dates first (today) if not user-set
+  setReportDefaultDates();
   populateFilters();
   const isAdmin=me&&me.role==='admin';
   document.getElementById('staffReportNotice').style.display=isAdmin?'none':'block';
