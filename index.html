@@ -892,11 +892,10 @@ function getFiltered(){
   const usr=isAdmin ? document.getElementById('filterUser').value.trim() : '';
   return base.filter(r=>{
     if(pin&&r.pin!==pin)return false;
-    const rd = r.rawDate ? String(r.rawDate).trim() : '';
+    // Always normalize to YYYY-MM-DD for reliable comparison
+    const rd = toRawDate(r.rawDate || r.date || '');
     if(from&&rd<from)return false;
     if(to&&rd>to)return false;
-    // to date inclusive: rd === to should pass (already does above)
-    // Match against postedBy OR fullName OR username (case-insensitive)
     if(usr){
       const match = (r.postedBy||'').trim()===usr || (r.username||'').trim()===usr;
       if(!match) return false;
