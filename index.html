@@ -488,7 +488,7 @@ function toRawDate(val){
     const [dd,mm,yyyy] = s.split('.');
     return `${yyyy}-${mm}-${dd}`;
   }
-  // DD/MM/YYYY → YYYY-MM-DD
+  // DD/MM/YYYY → YYYY-MM-DD (direct parse, no timezone issue)
   if(/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)){
     const parts = s.split('/');
     const dd = parts[0].padStart(2,'0');
@@ -496,17 +496,22 @@ function toRawDate(val){
     const yyyy = parts[2].substring(0,4);
     return `${yyyy}-${mm}-${dd}`;
   }
-  // Google Sheets raw Date string like "Sat Dec 30 1899 ..." or "Thu Apr 02 2026 ..."
-  // Try parsing with Date constructor
+  // Google Sheets raw Date string like "Thu Apr 01 2026 00:00:00 GMT+0600"
+  // Extract day/month/year directly from string to AVOID timezone shift bugs
+  const monthMap = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  const m = s.match(/(\w{3})\s+(\w{3})\s+(\d{2})\s+(\d{4})/);
+  if(m){
+    const yyyy = m[4];
+    const mm = monthMap[m[2]] || '01';
+    const dd = m[3].padStart(2,'0');
+    if(parseInt(yyyy) >= 1970) return `${yyyy}-${mm}-${dd}`;
+  }
+  // Fallback: use Date constructor with Bangladesh timezone
   const parsed = new Date(s);
   if(!isNaN(parsed.getTime())){
-    // Use UTC to avoid timezone shift
-    const yyyy = parsed.getFullYear();
-    // Google Sheets epoch bug: year 1899/1900 means it's a time-only value, skip
-    if(yyyy < 1970) return '';
-    const mm = String(parsed.getMonth()+1).padStart(2,'0');
-    const dd = String(parsed.getDate()).padStart(2,'0');
-    return `${yyyy}-${mm}-${dd}`;
+    if(parsed.getFullYear() < 1970) return '';
+    const localStr = parsed.toLocaleDateString('en-CA', {timeZone:'Asia/Dhaka'});
+    if(localStr && /^\d{4}-\d{2}-\d{2}/.test(localStr)) return localStr.substring(0,10);
   }
   return s;
 }
@@ -890,6 +895,7 @@ function getFiltered(){
     const rd = r.rawDate ? String(r.rawDate).trim() : '';
     if(from&&rd<from)return false;
     if(to&&rd>to)return false;
+    // to date inclusive: rd === to should pass (already does above)
     // Match against postedBy OR fullName OR username (case-insensitive)
     if(usr){
       const match = (r.postedBy||'').trim()===usr || (r.username||'').trim()===usr;
