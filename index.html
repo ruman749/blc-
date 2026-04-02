@@ -1066,8 +1066,7 @@ function renderUsers(){
 // DOWNLOAD REPORT — single button handles Excel + PDF
 function downloadReport(){
   const type = document.getElementById('reportType').value;
-  // First render with current filters so getFiltered() is up to date
-  renderReport();
+  // Do NOT call renderReport() here — it resets dates and corrupts the filter!
   if(type === 'excel') exportExcel();
   else exportPDF();
 }
