@@ -400,7 +400,7 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
             <th class="num">🍱 Lunch</th>
             <th class="num">🍵 E.Snacks</th>
             <th class="num">🍽️ Dinner</th>
-            <th class="num">Total</th><th>Remarks</th>
+            <th class="num">Total</th>
           </tr></thead>
           <tbody id="reportBody"></tbody>
         </table>
@@ -454,13 +454,26 @@ async function apiPost(payload){await fetch(SHEET_URL,{method:'POST',body:JSON.s
 function formatDate(raw){
   if(!raw) return '';
   const s = String(raw).trim();
-  // YYYY-MM-DD format (Apps Script sends this)
+  // YYYY-MM-DD format
   if(/^\d{4}-\d{2}-\d{2}/.test(s)){
     const [yyyy,mm,dd] = s.substring(0,10).split('-');
     return `${dd}.${mm}.${yyyy}`;
   }
   // DD.MM.YYYY already formatted
   if(/^\d{2}\.\d{2}\.\d{4}/.test(s)) return s;
+  // DD/MM/YYYY
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)){
+    const parts = s.split('/');
+    return `${parts[0].padStart(2,'0')}.${parts[1].padStart(2,'0')}.${parts[2].substring(0,4)}`;
+  }
+  // Google Sheets raw Date string — parse and reformat
+  const parsed = new Date(s);
+  if(!isNaN(parsed.getTime()) && parsed.getFullYear() >= 1970){
+    const yyyy = parsed.getFullYear();
+    const mm = String(parsed.getMonth()+1).padStart(2,'0');
+    const dd = String(parsed.getDate()).padStart(2,'0');
+    return `${dd}.${mm}.${yyyy}`;
+  }
   return s;
 }
 
@@ -475,6 +488,26 @@ function toRawDate(val){
     const [dd,mm,yyyy] = s.split('.');
     return `${yyyy}-${mm}-${dd}`;
   }
+  // DD/MM/YYYY → YYYY-MM-DD
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)){
+    const parts = s.split('/');
+    const dd = parts[0].padStart(2,'0');
+    const mm = parts[1].padStart(2,'0');
+    const yyyy = parts[2].substring(0,4);
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  // Google Sheets raw Date string like "Sat Dec 30 1899 ..." or "Thu Apr 02 2026 ..."
+  // Try parsing with Date constructor
+  const parsed = new Date(s);
+  if(!isNaN(parsed.getTime())){
+    // Use UTC to avoid timezone shift
+    const yyyy = parsed.getFullYear();
+    // Google Sheets epoch bug: year 1899/1900 means it's a time-only value, skip
+    if(yyyy < 1970) return '';
+    const mm = String(parsed.getMonth()+1).padStart(2,'0');
+    const dd = String(parsed.getDate()).padStart(2,'0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
   return s;
 }
 
@@ -484,7 +517,8 @@ function parseData(data){
   records=(data.meals||[]).filter(r=>
     r[0] && String(r[0]).trim() !== '' && String(r[0]).toLowerCase() !== 'id'
   ).map(r=>{
-    // format চেনার উপায়: r[3] যদি name (string) হয় তাহলে নতুন format
+    // Debug: log raw date value to console
+    if(r[1]) console.log('[DATE DEBUG] raw r[1]:', r[1], '→ toRawDate:', toRawDate(r[1]));
     const isNewFormat = isNaN(Number(r[3])) || r.length <= 12;
     if(isNewFormat){
       return {
@@ -932,7 +966,7 @@ function renderReport(){
   tbody.innerHTML=data.map((r,i)=>`
     <tr>
       <td>${i+1}</td>
-      <td style="white-space:nowrap;">${formatDate(r.rawDate||r.date)||''}<br><span style="font-size:11px;color:var(--muted);">${formatTime(r.time)||''}</span></td>
+      <td style="white-space:nowrap;">${r.date||''}</td>
       <td><b>${r.postedBy||''}</b></td>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px;">${r.pin||'—'}</span></td>
       <td class="num">${r.breakfast||0}</td>
@@ -941,7 +975,6 @@ function renderReport(){
       <td class="num">${r.esnacks||0}</td>
       <td class="num">${r.dinner||0}</td>
       <td class="num" style="color:var(--green);font-weight:800;">${r.total||0}</td>
-      <td class="remarks-cell">${r.remarks||'—'}</td>
     </tr>`).join('');
 }
 
@@ -1046,8 +1079,8 @@ function exportExcel(){
   const wb = XLSX.utils.book_new();
 
   // Detail sheet
-  const header=['#','Date','Time','Name','PIN','Breakfast','M.Snacks','Lunch','E.Snacks','Dinner','Total','Remarks'];
-  const rows=data.map((r,i)=>[i+1, r.date||'', formatTime(r.time)||'', r.postedBy||'', r.pin||'', r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0, r.remarks||'']);
+  const header=['#','Date','Name','PIN','Breakfast','M.Snacks','Lunch','E.Snacks','Dinner','Total'];
+  const rows=data.map((r,i)=>[i+1, r.date||'', r.postedBy||'', r.pin||'', r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0]);
   const ws=XLSX.utils.aoa_to_sheet([
     ['BLC Sreemangal — Meal Report'],
     [`Person: ${personLabel}  |  Date: ${bdDate}`],
@@ -1055,9 +1088,9 @@ function exportExcel(){
     header,
     ...rows,
     [],
-    ['','','','','TOTAL',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total,'']
+    ['','','','TOTAL',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total]
   ]);
-  ws['!cols']=[{wch:4},{wch:12},{wch:10},{wch:20},{wch:8},{wch:10},{wch:10},{wch:8},{wch:10},{wch:8},{wch:8},{wch:20}];
+  ws['!cols']=[{wch:4},{wch:14},{wch:24},{wch:10},{wch:11},{wch:11},{wch:10},{wch:11},{wch:10},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws,'Meal Report');
 
   XLSX.writeFile(wb,`BLC_Meals_${personLabel.replace(/ /g,'_')}_${bdDate}.xlsx`);
@@ -1094,21 +1127,20 @@ function exportPDF(){
 
   doc.autoTable({
     startY:34,
-    head:[['#','Date','Name','PIN','Bfast','M.Snk','Lunch','E.Snk','Dinner','Total','Remarks']],
+    head:[['#','Date','Name','PIN','Bfast','M.Snk','Lunch','E.Snk','Dinner','Total']],
     body:[
       ...data.map((r,i)=>[
         i+1,
-        (r.date||'') + (r.time ? '\n'+formatTime(r.time) : ''),
+        r.date||'',
         r.postedBy||'',
         r.pin||'',
-        r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0,
-        r.remarks||''
+        r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0
       ]),
-      ['','','TOTAL','',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total,'']
+      ['','','TOTAL','',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total]
     ],
     headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:9},
     bodyStyles:{fontSize:8},
-    columnStyles:{0:{cellWidth:8},1:{cellWidth:26},2:{cellWidth:38},3:{cellWidth:16},4:{cellWidth:13},5:{cellWidth:13},6:{cellWidth:13},7:{cellWidth:13},8:{cellWidth:13},9:{cellWidth:13},10:{cellWidth:28}},
+    columnStyles:{0:{cellWidth:8},1:{cellWidth:24},2:{cellWidth:42},3:{cellWidth:18},4:{cellWidth:15},5:{cellWidth:15},6:{cellWidth:15},7:{cellWidth:15},8:{cellWidth:15},9:{cellWidth:15}},
     alternateRowStyles:{fillColor:[216,243,220]},
     didParseCell:function(d){
       if(d.row.index===data.length){
