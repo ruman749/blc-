@@ -481,39 +481,39 @@ function formatDate(raw){
 function toRawDate(val){
   if(!val) return '';
   const s = String(val).trim();
-  // YYYY-MM-DD — just return first 10 chars
+  if(!s) return '';
+  // Already YYYY-MM-DD
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
-  // DD.MM.YYYY → YYYY-MM-DD
+  // DD.MM.YYYY
   if(/^\d{2}\.\d{2}\.\d{4}/.test(s)){
-    const [dd,mm,yyyy] = s.split('.');
-    return `${yyyy}-${mm}-${dd}`;
+    const p=s.split('.');
+    return p[2]+'-'+p[1]+'-'+p[0];
   }
-  // DD/MM/YYYY → YYYY-MM-DD (direct parse, no timezone issue)
+  // DD/MM/YYYY
   if(/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)){
-    const parts = s.split('/');
-    const dd = parts[0].padStart(2,'0');
-    const mm = parts[1].padStart(2,'0');
-    const yyyy = parts[2].substring(0,4);
-    return `${yyyy}-${mm}-${dd}`;
+    const p=s.split('/');
+    return p[2].substring(0,4)+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');
   }
-  // Google Sheets raw Date string like "Thu Apr 01 2026 00:00:00 GMT+0600"
-  // Extract day/month/year directly from string to AVOID timezone shift bugs
-  const monthMap = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
-  const m = s.match(/(\w{3})\s+(\w{3})\s+(\d{2})\s+(\d{4})/);
-  if(m){
-    const yyyy = m[4];
-    const mm = monthMap[m[2]] || '01';
-    const dd = m[3].padStart(2,'0');
-    if(parseInt(yyyy) >= 1970) return `${yyyy}-${mm}-${dd}`;
+  // Google Sheets: "Thu Apr 01 2026 ..." OR "Wed Apr 01" (no year)
+  const mmap={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  // With year: "Thu Apr 01 2026"
+  const gm=s.match(/\w{3}\s+(\w{3})\s+(\d{1,2})\s+(\d{4})/);
+  if(gm && parseInt(gm[3])>=1970){
+    return gm[3]+'-'+(mmap[gm[1]]||'01')+'-'+gm[2].padStart(2,'0');
   }
-  // Fallback: use Date constructor with Bangladesh timezone
-  const parsed = new Date(s);
-  if(!isNaN(parsed.getTime())){
-    if(parsed.getFullYear() < 1970) return '';
-    const localStr = parsed.toLocaleDateString('en-CA', {timeZone:'Asia/Dhaka'});
-    if(localStr && /^\d{4}-\d{2}-\d{2}/.test(localStr)) return localStr.substring(0,10);
+  // Without year: "Wed Apr 01" — use current year
+  const gm2=s.match(/^\w{3}\s+(\w{3})\s+(\d{1,2})$/);
+  if(gm2){
+    const yyyy=new Date().getFullYear();
+    return yyyy+'-'+(mmap[gm2[1]]||'01')+'-'+gm2[2].padStart(2,'0');
   }
-  return s;
+  // Fallback
+  const parsed=new Date(s);
+  if(!isNaN(parsed.getTime()) && parsed.getFullYear()>=1970){
+    const ls=parsed.toLocaleDateString('en-CA',{timeZone:'Asia/Dhaka'});
+    if(ls && /^\d{4}-\d{2}-\d{2}/.test(ls)) return ls.substring(0,10);
+  }
+  return '';
 }
 
 // PARSE DATA
@@ -890,18 +890,23 @@ function getFiltered(){
   const from=document.getElementById('filterFrom').value;
   const to=document.getElementById('filterTo').value;
   const usr=isAdmin ? document.getElementById('filterUser').value.trim() : '';
-  return base.filter(r=>{
+  console.log('[FILTER] from='+from+' to='+to+' total records='+base.length);
+  const filtered = base.filter(r=>{
     if(pin&&r.pin!==pin)return false;
     // Always normalize to YYYY-MM-DD for reliable comparison
     const rd = toRawDate(r.rawDate || r.date || '');
-    if(from&&rd<from)return false;
-    if(to&&rd>to)return false;
+    console.log('[FILTER] rd='+rd+' rawDate='+r.rawDate+' date='+r.date);
+    if(from&&rd&&rd<from)return false;
+    if(to&&rd&&rd>to)return false;
+    if(!rd) return true; // if date unknown, include it
     if(usr){
       const match = (r.postedBy||'').trim()===usr || (r.username||'').trim()===usr;
       if(!match) return false;
     }
     return true;
   });
+  console.log('[FILTER] result count='+filtered.length);
+  return filtered;
 }
 
 function clearFilters(){
