@@ -164,11 +164,12 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
 <div id="authOuter" class="auth-outer">
   <div class="auth-wrap">
     <div class="auth-logo">
+      <p style="font-size:16px;color:var(--green);margin-bottom:8px;font-weight:700;letter-spacing:.05em;">Welcome</p>
       <div class="icon">🍽️</div>
       <h2>BLC Sreemangal</h2>
       <p>Meal Count Management System</p>
     </div>
-    <div class="auth-tabs">
+    <div class="auth-tabs" style="display:none;">
       <div class="auth-tab active" id="tabLogin" onclick="switchAuth('login')">🔐 Login</div>
       <div class="auth-tab" id="tabReg" onclick="switchAuth('register')">📝 Register</div>
     </div>
@@ -184,6 +185,7 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
         <input type="password" id="loginPass" placeholder="Enter your password" onkeydown="if(event.key==='Enter')doLogin()"/>
       </div>
       <button class="btn-submit" onclick="doLogin()">🔐 Login</button>
+      <div class="hint-link" style="margin-top:10px;">Forgot password? <span onclick="switchAuth('forgot')">Reset here</span></div>
       <div class="hint-link">No account? <span onclick="switchAuth('register')">Register here</span></div>
     </div>
 
@@ -230,6 +232,21 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
       <button class="btn-submit" onclick="doRegister()">✅ Create Account</button>
       <div class="hint-link">Already registered? <span onclick="switchAuth('login')">Login here</span></div>
     </div>
+
+    <!-- FORGOT PASSWORD -->
+    <div id="forgotForm" style="display:none;">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:36px;">🔑</div>
+        <div style="font-weight:700;font-size:16px;color:var(--green);margin-top:6px;">Password Reset</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px;">আপনার registered email দিন, reset link পাঠানো হবে</div>
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="forgotEmail" placeholder="your@email.com"/>
+      </div>
+      <button class="btn-submit" onclick="doForgotPassword()">📧 Send Reset Link</button>
+      <div class="hint-link" style="margin-top:12px;"><span onclick="switchAuth('login')">← Back to Login</span></div>
+    </div>
   </div>
 </div>
 
@@ -253,6 +270,7 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
     <div class="nav-tab" onclick="showPage('report',this)">📊 Report</div>
     <div class="nav-tab" onclick="showPage('history',this)">📋 History</div>
     <div class="nav-tab admin-only" onclick="showPage('users',this)">👥 Users</div>
+    <div class="nav-tab" onclick="showPage('changepass',this)">🔒 Change Password</div>
   </div>
 
   <div class="main">
@@ -427,13 +445,33 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
       <div class="users-grid" id="usersGrid"></div>
     </div>
 
+    <!-- CHANGE PASSWORD -->
+    <div class="page" id="page-changepass">
+      <div class="section-title">🔒 Change Password</div>
+      <div class="form-card" style="max-width:460px;">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="cpCurrent" placeholder="Enter current password"/>
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="cpNew" placeholder="Enter new password (min 4 characters)"/>
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="cpConfirm" placeholder="Repeat new password"/>
+        </div>
+        <button class="btn-submit" onclick="doChangePassword()">🔒 Update Password</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxFrB76f4mrRk-iSmDtsauWqSXZQlH0xZ-dyaAhnwPYr3I7ph8xQ1eR68QZh_wE3-AzQg/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyWL2ULHFx3TM10jF1bAE0-YnTKOuHZvD7VC7mcBj3AIAlXIuTsOeOFOKDDB4adAKpFRw/exec';
 const STAFF_CODE = 'BLC@2024';
 const ADMIN_CODE = 'BLCADMIN@2024';
 
@@ -562,8 +600,38 @@ async function loadData(){
 function switchAuth(mode){
   document.getElementById('loginForm').style.display=mode==='login'?'block':'none';
   document.getElementById('registerForm').style.display=mode==='register'?'block':'none';
+  document.getElementById('forgotForm').style.display=mode==='forgot'?'block':'none';
   document.getElementById('tabLogin').classList.toggle('active',mode==='login');
   document.getElementById('tabReg').classList.toggle('active',mode==='register');
+}
+
+// FORGOT PASSWORD
+async function doForgotPassword(){
+  const email = document.getElementById('forgotEmail').value.trim();
+  if(!email){toast('⚠️ Email দিন','error');return;}
+  showLoading('Checking email...');
+  try{const data=await apiGet();parseData(data);}catch(e){hideLoading();toast('❌ Connection failed','error');return;}
+  const user = users.find(u=>u.email && u.email.toLowerCase()===email.toLowerCase());
+  if(!user){hideLoading();toast('❌ এই email দিয়ে কোনো account নেই','error');return;}
+  // Send reset request to Apps Script
+  const resetToken = Math.random().toString(36).substring(2,10).toUpperCase();
+  const resetPayload = {
+    type:'resetPassword',
+    email: user.email,
+    username: user.fullName,
+    token: resetToken,
+    userId: user.id
+  };
+  try{
+    await apiPost(resetPayload);
+    hideLoading();
+    toast('✅ Reset link আপনার email এ পাঠানো হয়েছে!');
+    document.getElementById('forgotEmail').value='';
+    setTimeout(()=>switchAuth('login'), 2500);
+  }catch(e){
+    hideLoading();
+    toast('❌ Failed to send email. Try again.','error');
+  }
 }
 
 // REGISTER
@@ -1168,6 +1236,30 @@ function exportPDF(){
 function doPrint(){
   document.getElementById('printDate').textContent=new Date().toLocaleString('en-BD');
   window.print();
+}
+
+// CHANGE PASSWORD
+async function doChangePassword(){
+  const current = document.getElementById('cpCurrent').value;
+  const newPass  = document.getElementById('cpNew').value;
+  const confirm  = document.getElementById('cpConfirm').value;
+  if(!current||!newPass||!confirm){toast('⚠️ সব field পূরণ করুন','error');return;}
+  if(String(me.password) !== String(current)){toast('❌ Current password ভুল','error');return;}
+  if(newPass.length < 4){toast('❌ Password কমপক্ষে ৪ অক্ষর হতে হবে','error');return;}
+  if(newPass !== confirm){toast('❌ New password match হয়নি','error');return;}
+  showLoading('Updating password...');
+  try{
+    await apiPost({type:'changePassword', userId: me.id, username: me.username, newPassword: newPass});
+    me.password = newPass;
+    hideLoading();
+    toast('✅ Password সফলভাবে পরিবর্তন হয়েছে!');
+    document.getElementById('cpCurrent').value='';
+    document.getElementById('cpNew').value='';
+    document.getElementById('cpConfirm').value='';
+  }catch(e){
+    hideLoading();
+    toast('❌ Failed to update. Try again.','error');
+  }
 }
 </script>
 </body>
