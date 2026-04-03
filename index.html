@@ -235,21 +235,72 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
 
     <!-- FORGOT PASSWORD -->
     <div id="forgotForm" style="display:none;">
-      <div style="text-align:center;margin-bottom:16px;">
-        <div style="font-size:36px;">🔑</div>
-        <div style="font-weight:700;font-size:16px;color:var(--green);margin-top:6px;">Password Reset</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:4px;">Username অথবা Email দিন, Admin আপনার password reset করবেন</div>
+      <!-- Step 1: password change (জানা থাকলে) -->
+      <div id="changePassSection">
+        <div style="text-align:center;margin-bottom:16px;">
+          <div style="font-size:36px;">🔐</div>
+          <div style="font-weight:700;font-size:16px;color:var(--green);margin-top:6px;">Password পরিবর্তন</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px;">পুরনো password জানলে এখানে পরিবর্তন করুন</div>
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="forgotUsername" placeholder="আপনার username দিন"/>
+        </div>
+        <div class="form-group">
+          <label>পুরনো Password</label>
+          <input type="password" id="forgotOldPass" placeholder="বর্তমান password দিন"/>
+        </div>
+        <div class="form-group">
+          <label>নতুন Password</label>
+          <input type="password" id="forgotNewPass" placeholder="নতুন password দিন"/>
+        </div>
+        <div class="form-group">
+          <label>নতুন Password নিশ্চিত করুন</label>
+          <input type="password" id="forgotNewPass2" placeholder="আবার নতুন password দিন"/>
+        </div>
+        <button class="btn-submit" onclick="doChangePassword()">🔐 Password পরিবর্তন করুন</button>
+        <div style="text-align:center;margin:14px 0;font-size:13px;color:var(--muted);">— অথবা —</div>
+        <div style="text-align:center;font-size:13px;color:var(--green);cursor:pointer;font-weight:600;" onclick="showOTPSection()">📧 Password ভুলে গেছেন? Email OTP দিয়ে reset করুন</div>
       </div>
-      <div class="form-group">
-        <label>Username</label>
-        <input type="text" id="forgotUsername" placeholder="আপনার username দিন"/>
+
+      <!-- Step 2: OTP পাঠানো -->
+      <div id="otpSendSection" style="display:none;">
+        <div style="text-align:center;margin-bottom:16px;">
+          <div style="font-size:36px;">📧</div>
+          <div style="font-weight:700;font-size:16px;color:var(--green);margin-top:6px;">Email OTP Reset</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px;">আপনার registered email এ OTP পাঠানো হবে</div>
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="otpEmail" placeholder="your@email.com"/>
+        </div>
+        <button class="btn-submit" onclick="doSendOTP()">📧 OTP পাঠান</button>
+        <div style="text-align:center;margin-top:10px;font-size:13px;color:var(--green);cursor:pointer;" onclick="showChangeSection()">← পুরনো password দিয়ে পরিবর্তন করুন</div>
       </div>
-      <div style="text-align:center;font-size:12px;color:var(--muted);margin:4px 0;">— অথবা —</div>
-      <div class="form-group">
-        <label>Email Address</label>
-        <input type="email" id="forgotEmail" placeholder="your@email.com"/>
+
+      <!-- Step 3: OTP verify ও নতুন password -->
+      <div id="otpVerifySection" style="display:none;">
+        <div style="text-align:center;margin-bottom:16px;">
+          <div style="font-size:36px;">✅</div>
+          <div style="font-weight:700;font-size:16px;color:var(--green);margin-top:6px;">OTP যাচাই করুন</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px;" id="otpSentMsg">আপনার email এ OTP পাঠানো হয়েছে</div>
+        </div>
+        <div class="form-group">
+          <label>OTP Code</label>
+          <input type="text" id="otpCode" placeholder="6 digit OTP দিন" maxlength="6"/>
+        </div>
+        <div class="form-group">
+          <label>নতুন Password</label>
+          <input type="password" id="otpNewPass" placeholder="নতুন password দিন"/>
+        </div>
+        <div class="form-group">
+          <label>নতুন Password নিশ্চিত করুন</label>
+          <input type="password" id="otpNewPass2" placeholder="আবার নতুন password দিন"/>
+        </div>
+        <button class="btn-submit" onclick="doVerifyOTP()">✅ Password Reset করুন</button>
+        <div style="text-align:center;margin-top:10px;font-size:13px;color:var(--green);cursor:pointer;" onclick="showOTPSection()">← আবার OTP পাঠান</div>
       </div>
-      <button class="btn-submit" onclick="doForgotPassword()">📧 Send Reset Link</button>
+
       <div class="hint-link" style="margin-top:12px;"><span onclick="switchAuth('login')">← Back to Login</span></div>
     </div>
   </div>
@@ -476,7 +527,7 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
 <div class="toast" id="toast"></div>
 
 <script>
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwgZurzHiEO5zrSkWEBBzoDMp37TNbopn2jhjGkbGR9xQKyXiTLL5pYXwpPc-eLO8quoA/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyYSUuRnN6hycIcr5nvDfngFfnxko-bD0-0HLxZSm8d1bXOsPufmDLigvc_EI922zNNdg/exec';
 const STAFF_CODE = 'BLC@2024';
 const ADMIN_CODE = 'BLCADMIN@2024';
 
@@ -608,40 +659,93 @@ function switchAuth(mode){
   document.getElementById('forgotForm').style.display=mode==='forgot'?'block':'none';
   document.getElementById('tabLogin').classList.toggle('active',mode==='login');
   document.getElementById('tabReg').classList.toggle('active',mode==='register');
+  // Reset forgot sections to default
+  if(mode==='forgot'){
+    document.getElementById('changePassSection').style.display='block';
+    document.getElementById('otpSendSection').style.display='none';
+    document.getElementById('otpVerifySection').style.display='none';
+  }
 }
 
-// FORGOT PASSWORD
-async function doForgotPassword(){
-  const email = document.getElementById('forgotEmail').value.trim();
-  const uname = document.getElementById('forgotUsername').value.trim();
-  if(!email && !uname){toast('⚠️ Username অথবা Email দিন','error');return;}
-  showLoading('Checking account...');
+// SECTION TOGGLE
+function showOTPSection(){
+  document.getElementById('changePassSection').style.display='none';
+  document.getElementById('otpSendSection').style.display='block';
+  document.getElementById('otpVerifySection').style.display='none';
+}
+function showChangeSection(){
+  document.getElementById('changePassSection').style.display='block';
+  document.getElementById('otpSendSection').style.display='none';
+  document.getElementById('otpVerifySection').style.display='none';
+}
+
+// CHANGE PASSWORD (পুরনো password দিয়ে)
+async function doChangePassword(){
+  const uname    = document.getElementById('forgotUsername').value.trim();
+  const oldPass  = document.getElementById('forgotOldPass').value;
+  const newPass  = document.getElementById('forgotNewPass').value;
+  const newPass2 = document.getElementById('forgotNewPass2').value;
+  if(!uname||!oldPass||!newPass||!newPass2){toast('⚠️ সব field পূরণ করুন','error');return;}
+  if(newPass!==newPass2){toast('❌ নতুন password মিলছে না','error');return;}
+  if(newPass.length<4){toast('❌ Password কমপক্ষে ৪ অক্ষর হতে হবে','error');return;}
+  showLoading('Verifying...');
   try{const data=await apiGet();parseData(data);}catch(e){hideLoading();toast('❌ Connection failed','error');return;}
-  const user = users.find(u=>
-    (email && u.email && u.email.toLowerCase()===email.toLowerCase()) ||
-    (uname && u.username && u.username.toLowerCase()===uname.toLowerCase())
-  );
-  if(!user){hideLoading();toast('❌ এই তথ্য দিয়ে কোনো account নেই','error');return;}
-  // Send reset request to Apps Script
-  const resetToken = Math.random().toString(36).substring(2,10).toUpperCase();
-  const resetPayload = {
-    type:'resetPassword',
-    email: user.email,
-    username: user.fullName,
-    token: resetToken,
-    userId: user.id
-  };
+  const user=users.find(u=>u.username&&u.username.toLowerCase()===uname.toLowerCase());
+  if(!user){hideLoading();toast('❌ Username পাওয়া যায়নি','error');return;}
+  if(String(user.password)!==String(oldPass)){hideLoading();toast('❌ পুরনো password ভুল','error');return;}
+  showLoading('Password পরিবর্তন হচ্ছে...');
   try{
-    await apiPost(resetPayload);
+    await apiPost({type:'updatePassword',userId:user.id,username:user.username,newPassword:newPass});
     hideLoading();
-    toast('✅ Request পাঠানো হয়েছে! Admin আপনার password reset করবেন।');
-    document.getElementById('forgotEmail').value='';
-    document.getElementById('forgotUsername').value='';
-    setTimeout(()=>switchAuth('login'), 2500);
-  }catch(e){
+    toast('✅ Password সফলভাবে পরিবর্তন হয়েছে!');
+    ['forgotUsername','forgotOldPass','forgotNewPass','forgotNewPass2'].forEach(id=>document.getElementById(id).value='');
+    setTimeout(()=>switchAuth('login'),2000);
+  }catch(e){hideLoading();toast('❌ Failed. Try again.','error');}
+}
+
+// OTP পাঠানো
+async function doSendOTP(){
+  const email=document.getElementById('otpEmail').value.trim();
+  if(!email){toast('⚠️ Email দিন','error');return;}
+  showLoading('OTP পাঠানো হচ্ছে...');
+  try{
+    const res=await fetch(SHEET_URL,{method:'POST',body:JSON.stringify({type:'sendOTP',email})});
+    const result=await res.json();
     hideLoading();
-    toast('❌ Failed. Try again.','error');
-  }
+    if(result.success){
+      document.getElementById('otpSentMsg').textContent=`OTP পাঠানো হয়েছে: ${email}`;
+      document.getElementById('otpSendSection').style.display='none';
+      document.getElementById('otpVerifySection').style.display='block';
+      toast('✅ OTP আপনার email এ পাঠানো হয়েছে!');
+    } else {
+      toast('❌ '+(result.msg==='Email not found'?'এই email দিয়ে কোনো account নেই':'Failed. Try again.'),'error');
+    }
+  }catch(e){hideLoading();toast('❌ Connection failed','error');}
+}
+
+// OTP verify ও নতুন password set
+async function doVerifyOTP(){
+  const email   =document.getElementById('otpEmail').value.trim();
+  const otp     =document.getElementById('otpCode').value.trim();
+  const newPass =document.getElementById('otpNewPass').value;
+  const newPass2=document.getElementById('otpNewPass2').value;
+  if(!otp||!newPass||!newPass2){toast('⚠️ সব field পূরণ করুন','error');return;}
+  if(newPass!==newPass2){toast('❌ নতুন password মিলছে না','error');return;}
+  if(newPass.length<4){toast('❌ Password কমপক্ষে ৪ অক্ষর হতে হবে','error');return;}
+  showLoading('Verifying OTP...');
+  try{
+    const res=await fetch(SHEET_URL,{method:'POST',body:JSON.stringify({type:'verifyOTPAndReset',email,otp,newPassword:newPass})});
+    const result=await res.json();
+    hideLoading();
+    if(result.success){
+      toast('✅ Password সফলভাবে reset হয়েছে!');
+      ['otpCode','otpNewPass','otpNewPass2'].forEach(id=>document.getElementById(id).value='');
+      setTimeout(()=>switchAuth('login'),2000);
+    } else {
+      const msg=result.msg==='Wrong OTP'?'OTP ভুল':result.msg==='OTP expired'?'OTP মেয়াদ শেষ, আবার পাঠান':'Failed. Try again.';
+      toast('❌ '+msg,'error');
+    }
+  }catch(e){hideLoading();toast('❌ Connection failed','error');}
 }
 
 // REGISTER
