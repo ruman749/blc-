@@ -534,6 +534,7 @@ const ADMIN_CODE = 'BLCADMIN@2024';
 
 const MEAL_RATES={breakfast:40,msnacks:0,lunch:80,esnacks:0,dinner:80};
 function calcAmount(r){return (r.breakfast||0)*MEAL_RATES.breakfast+(r.msnacks||0)*MEAL_RATES.msnacks+(r.lunch||0)*MEAL_RATES.lunch+(r.esnacks||0)*MEAL_RATES.esnacks+(r.dinner||0)*MEAL_RATES.dinner;}
+function realTotal(r){return (r.breakfast||0)+(r.msnacks||0)+(r.lunch||0)+(r.esnacks||0)+(r.dinner||0);}
 let records=[], users=[], counts={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0}, me=null;
 
 // CLOCK
@@ -1142,7 +1143,7 @@ function renderReport(){
 
   const data=getFiltered();
   const T={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0,total:0};
-  data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=r.total||0;});
+  data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=realTotal(r);});
 
   const personsLabel = isAdmin ? 'Persons' : 'Entries';
   const personsIcon  = isAdmin ? '👤' : '📝';
@@ -1170,7 +1171,7 @@ function renderReport(){
       <td class="num">${r.lunch||0}</td>
       <td class="num">${r.esnacks||0}</td>
       <td class="num">${r.dinner||0}</td>
-      <td class="num" style="color:var(--green);font-weight:800;">${r.total||0}</td>
+      <td class="num" style="color:var(--green);font-weight:800;">${realTotal(r)}</td>
       <td class="num" style="color:var(--orange);font-weight:800;">৳${calcAmount(r)}</td>
     </tr>`).join('');
 }
@@ -1197,7 +1198,7 @@ function renderHistory(){
     .sort((a,b)=>b[0].localeCompare(a[0]))
     .map(([dateKey, recs])=>{
     const displayDate = formatDate(dateKey) || recs[0].date || dateKey;
-    const totalMeals = recs.reduce((s,r)=>s+(r.total||0),0);
+    const totalMeals = recs.reduce((s,r)=>s+(realTotal(r)),0);
     const rows = recs.map((r,i)=>`
       <tr>
         <td>${i+1}</td>
@@ -1208,7 +1209,7 @@ function renderHistory(){
         <td class="num">${r.lunch||0}</td>
         <td class="num">${r.esnacks||0}</td>
         <td class="num">${r.dinner||0}</td>
-        <td class="num" style="color:var(--green);font-weight:800;">${r.total||0}</td>
+        <td class="num" style="color:var(--green);font-weight:800;">${realTotal(r)}</td>
         <td class="remarks-cell">${r.remarks||'—'}</td>
       </tr>`).join('');
     return `
@@ -1270,13 +1271,13 @@ function exportExcel(){
 
   // Summary sheet data
   const T={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0,total:0};
-  data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=r.total||0;});
+  data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=realTotal(r);});
 
   const wb = XLSX.utils.book_new();
 
   // Detail sheet
   const header=['#','Date','Name','PIN','Breakfast','M.Snacks','Lunch','E.Snacks','Dinner','Total','Amount (৳)'];
-  const rows=data.map((r,i)=>[i+1, r.date||'', r.postedBy||'', r.pin||'', r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0, calcAmount(r)]);
+  const rows=data.map((r,i)=>[i+1, r.date||'', r.postedBy||'', r.pin||'', r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, realTotal(r), calcAmount(r)]);
   const ws=XLSX.utils.aoa_to_sheet([
     ['BLC Sreemangal — Meal Report'],
     [`Person: ${personLabel}  |  Date: ${bdDate}`],
@@ -1307,7 +1308,7 @@ function exportPDF(){
   const desigLabel = selUser ? (selUser.designation||'—') : '—';
 
   const T={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0,total:0};
-  data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=r.total||0;});
+  data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=realTotal(r);});
 
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -1346,7 +1347,7 @@ function exportPDF(){
         r.date||'',
         r.postedBy||'',
         r.pin||'',
-        r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0, calcAmount(r)
+        r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, realTotal(r), calcAmount(r)
       ]),
       ['','','TOTAL','',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total,data.reduce((s,r)=>s+calcAmount(r),0)]
     ],
