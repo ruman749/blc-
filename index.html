@@ -1327,22 +1327,18 @@ function exportPDF(){
   doc.setFontSize(10);doc.setFont(undefined,'normal');
   doc.text('BLC Sreemangal',148.5,18,{align:'center'});
 
-  // Line 3: Name | PIN | Designation
+  // Line 3: Name | PIN | Designation (বাম পাশে)
   doc.setFontSize(8.5);
   if(filterUser){
-    doc.text(`Name: ${personLabel}   |   PIN: ${pinLabel}   |   Designation: ${desigLabel}   |   Total Records: ${data.length}`,148.5,25,{align:'center'});
+    doc.text(`Name: ${personLabel}   |   PIN: ${pinLabel}   |   Designation: ${desigLabel}   |   Total Records: ${data.length}`,14,25);
   } else {
-    doc.text(`All Staff   |   Total Records: ${data.length}`,148.5,25,{align:'center'});
+    doc.text(`All Staff   |   Total Records: ${data.length}`,14,25);
   }
 
-  // Summary row
-  doc.setTextColor(45,106,79);
-  doc.setFontSize(9);doc.setFont(undefined,'bold');
   const totalAmount = data.reduce((s,r)=>s+calcAmount(r),0);
-  doc.text(`Summary:  Breakfast: ${T.breakfast}  |  M.Snacks: ${T.msnacks}  |  Lunch: ${T.lunch}  |  E.Snacks: ${T.esnacks}  |  Dinner: ${T.dinner}  |  TOTAL: ${T.total}  |  Amount: ৳${totalAmount}`,14,37);
 
   doc.autoTable({
-    startY:41,
+    startY:30,
     head:[['#','Date','Name','PIN','Bfast','M.Snk','Lunch','E.Snk','Dinner','Total','Amount (৳)']],
     body:[
       ...data.map((r,i)=>[
