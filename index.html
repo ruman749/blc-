@@ -475,6 +475,7 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
             <th class="num">🍵 E.Snacks</th>
             <th class="num">🍽️ Dinner</th>
             <th class="num">Total</th>
+            <th class="num">Amount (৳)</th>
           </tr></thead>
           <tbody id="reportBody"></tbody>
         </table>
@@ -531,6 +532,8 @@ const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyYSUuRnN6hycIcr5nvDf
 const STAFF_CODE = 'BLC@2024';
 const ADMIN_CODE = 'BLCADMIN@2024';
 
+const MEAL_RATES={breakfast:40,msnacks:0,lunch:80,esnacks:0,dinner:80};
+function calcAmount(r){return (r.breakfast||0)*MEAL_RATES.breakfast+(r.msnacks||0)*MEAL_RATES.msnacks+(r.lunch||0)*MEAL_RATES.lunch+(r.esnacks||0)*MEAL_RATES.esnacks+(r.dinner||0)*MEAL_RATES.dinner;}
 let records=[], users=[], counts={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0}, me=null;
 
 // CLOCK
@@ -1151,7 +1154,8 @@ function renderReport(){
     <div class="sum-card"><div class="sum-icon">🥐</div><div><div class="sum-label">M. Snacks</div><div class="sum-val">${T.msnacks}</div></div></div>
     <div class="sum-card"><div class="sum-icon">🍱</div><div><div class="sum-label">Lunch</div><div class="sum-val">${T.lunch}</div></div></div>
     <div class="sum-card"><div class="sum-icon">🍵</div><div><div class="sum-label">E. Snacks</div><div class="sum-val">${T.esnacks}</div></div></div>
-    <div class="sum-card"><div class="sum-icon">🍽️</div><div><div class="sum-label">Dinner</div><div class="sum-val">${T.dinner}</div></div></div>`;
+    <div class="sum-card"><div class="sum-icon">🍽️</div><div><div class="sum-label">Dinner</div><div class="sum-val">${T.dinner}</div></div></div>
+    <div class="sum-card"><div class="sum-icon">💰</div><div><div class="sum-label">Total Amount</div><div class="sum-val" style="color:var(--orange);">৳${data.reduce((s,r)=>s+calcAmount(r),0)}</div></div></div>`;
 
   const tbody=document.getElementById('reportBody');
   if(!data.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);">No records found</td></tr>';return;}
@@ -1167,6 +1171,7 @@ function renderReport(){
       <td class="num">${r.esnacks||0}</td>
       <td class="num">${r.dinner||0}</td>
       <td class="num" style="color:var(--green);font-weight:800;">${r.total||0}</td>
+      <td class="num" style="color:var(--orange);font-weight:800;">৳${calcAmount(r)}</td>
     </tr>`).join('');
 }
 
@@ -1270,8 +1275,8 @@ function exportExcel(){
   const wb = XLSX.utils.book_new();
 
   // Detail sheet
-  const header=['#','Date','Name','PIN','Breakfast','M.Snacks','Lunch','E.Snacks','Dinner','Total'];
-  const rows=data.map((r,i)=>[i+1, r.date||'', r.postedBy||'', r.pin||'', r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0]);
+  const header=['#','Date','Name','PIN','Breakfast','M.Snacks','Lunch','E.Snacks','Dinner','Total','Amount (৳)'];
+  const rows=data.map((r,i)=>[i+1, r.date||'', r.postedBy||'', r.pin||'', r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0, calcAmount(r)]);
   const ws=XLSX.utils.aoa_to_sheet([
     ['BLC Sreemangal — Meal Report'],
     [`Person: ${personLabel}  |  Date: ${bdDate}`],
@@ -1279,7 +1284,7 @@ function exportExcel(){
     header,
     ...rows,
     [],
-    ['','','','TOTAL',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total]
+    ['','','','TOTAL',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total,data.reduce((s,r)=>s+calcAmount(r),0)]
   ]);
   ws['!cols']=[{wch:4},{wch:14},{wch:24},{wch:10},{wch:11},{wch:11},{wch:10},{wch:11},{wch:10},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws,'Meal Report');
@@ -1296,42 +1301,62 @@ function exportPDF(){
   const filterUser=document.getElementById('filterUser').value;
   const personLabel = filterUser ? filterUser : 'All Staff';
 
+  // Selected user এর PIN ও Designation বের করি
+  const selUser = users.find(u=>(u.fullName||'').trim()===filterUser.trim());
+  const pinLabel = selUser ? (selUser.pin||'—') : '—';
+  const desigLabel = selUser ? (selUser.designation||'—') : '—';
+
   const T={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0,total:0};
   data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=r.total||0;});
 
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
 
-  // Header
+  // Header — green background, taller to fit 3 lines
   doc.setFillColor(45,106,79);
-  doc.rect(0,0,297,22,'F');
+  doc.rect(0,0,297,28,'F');
   doc.setTextColor(255,255,255);
-  doc.setFontSize(14);doc.setFont(undefined,'bold');
-  doc.text('BLC Sreemangal — Meal Report',14,10);
+
+  // Line 1: Meal Report (মাঝখানে) | Date (ডান কোণায়)
+  doc.setFontSize(16);doc.setFont(undefined,'bold');
+  doc.text('Meal Report',148.5,11,{align:'center'});
   doc.setFontSize(9);doc.setFont(undefined,'normal');
-  doc.text(`Person: ${personLabel}   |   Date: ${bdDate}   |   Total Records: ${data.length}`,14,17);
+  doc.text(`Date: ${bdDate}`,283,11,{align:'right'});
+
+  // Line 2: BLC Sreemangal (মাঝখানে)
+  doc.setFontSize(10);doc.setFont(undefined,'normal');
+  doc.text('BLC Sreemangal',148.5,18,{align:'center'});
+
+  // Line 3: Name | PIN | Designation
+  doc.setFontSize(8.5);
+  if(filterUser){
+    doc.text(`Name: ${personLabel}   |   PIN: ${pinLabel}   |   Designation: ${desigLabel}   |   Total Records: ${data.length}`,148.5,25,{align:'center'});
+  } else {
+    doc.text(`All Staff   |   Total Records: ${data.length}`,148.5,25,{align:'center'});
+  }
 
   // Summary row
   doc.setTextColor(45,106,79);
   doc.setFontSize(9);doc.setFont(undefined,'bold');
-  doc.text(`Summary:  Breakfast: ${T.breakfast}  |  M.Snacks: ${T.msnacks}  |  Lunch: ${T.lunch}  |  E.Snacks: ${T.esnacks}  |  Dinner: ${T.dinner}  |  TOTAL: ${T.total}`,14,30);
+  const totalAmount = data.reduce((s,r)=>s+calcAmount(r),0);
+  doc.text(`Summary:  Breakfast: ${T.breakfast}  |  M.Snacks: ${T.msnacks}  |  Lunch: ${T.lunch}  |  E.Snacks: ${T.esnacks}  |  Dinner: ${T.dinner}  |  TOTAL: ${T.total}  |  Amount: ৳${totalAmount}`,14,37);
 
   doc.autoTable({
-    startY:34,
-    head:[['#','Date','Name','PIN','Bfast','M.Snk','Lunch','E.Snk','Dinner','Total']],
+    startY:41,
+    head:[['#','Date','Name','PIN','Bfast','M.Snk','Lunch','E.Snk','Dinner','Total','Amount (৳)']],
     body:[
       ...data.map((r,i)=>[
         i+1,
         r.date||'',
         r.postedBy||'',
         r.pin||'',
-        r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0
+        r.breakfast||0, r.msnacks||0, r.lunch||0, r.esnacks||0, r.dinner||0, r.total||0, calcAmount(r)
       ]),
-      ['','','TOTAL','',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total]
+      ['','','TOTAL','',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total,data.reduce((s,r)=>s+calcAmount(r),0)]
     ],
     headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:9},
     bodyStyles:{fontSize:8},
-    columnStyles:{0:{cellWidth:8},1:{cellWidth:24},2:{cellWidth:42},3:{cellWidth:18},4:{cellWidth:15},5:{cellWidth:15},6:{cellWidth:15},7:{cellWidth:15},8:{cellWidth:15},9:{cellWidth:15}},
+    columnStyles:{0:{cellWidth:8},1:{cellWidth:22},2:{cellWidth:38},3:{cellWidth:16},4:{cellWidth:13},5:{cellWidth:13},6:{cellWidth:13},7:{cellWidth:13},8:{cellWidth:13},9:{cellWidth:13},10:{cellWidth:18}},
     alternateRowStyles:{fillColor:[216,243,220]},
     didParseCell:function(d){
       if(d.row.index===data.length){
