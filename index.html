@@ -1265,9 +1265,9 @@ function downloadReport(){
 function exportExcel(){
   const data=getFiltered();
   if(!data.length){toast('No data to export','error');return;}
-  const bdDate=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Dhaka'});
+  const bdDate=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'Asia/Dhaka'}).replace(/ /g,' ');
   const filterUser=document.getElementById('filterUser').value;
-  const personLabel = filterUser ? filterUser : 'All Staff';
+  const personLabel = filterUser ? filterUser : (me&&me.role!=='admin'?me.fullName:'All Staff');
 
   // Summary sheet data
   const T={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0,total:0};
@@ -1298,14 +1298,26 @@ function exportExcel(){
 function exportPDF(){
   const data=getFiltered();
   if(!data.length){toast('No data to export','error');return;}
-  const bdDate=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Dhaka'});
+  const bdDate=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'Asia/Dhaka'}).replace(/ /g,' ');
   const filterUser=document.getElementById('filterUser').value;
-  const personLabel = filterUser ? filterUser : 'All Staff';
+  const isAdmin = me && me.role==='admin';
 
-  // Selected user এর PIN ও Designation বের করি
-  const selUser = users.find(u=>(u.fullName||'').trim()===filterUser.trim());
-  const pinLabel = selUser ? (selUser.pin||'—') : '—';
-  const desigLabel = selUser ? (selUser.designation||'—') : '—';
+  // Staff হলে নিজের info, Admin হলে selected user এর info
+  let personLabel, pinLabel, desigLabel;
+  if(isAdmin && filterUser){
+    personLabel = filterUser;
+    const selUser = users.find(u=>(u.fullName||'').trim()===filterUser.trim());
+    pinLabel = selUser ? (selUser.pin||'—') : '—';
+    desigLabel = selUser ? (selUser.designation||'—') : '—';
+  } else if(!isAdmin){
+    personLabel = me.fullName||'';
+    pinLabel = me.pin||'—';
+    desigLabel = me.designation||'—';
+  } else {
+    personLabel = 'All Staff';
+    pinLabel = '';
+    desigLabel = '';
+  }
 
   const T={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0,total:0};
   data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=realTotal(r);});
@@ -1330,7 +1342,7 @@ function exportPDF(){
 
   // Line 3: Name | PIN | Designation (বাম পাশে)
   doc.setFontSize(8.5);
-  if(filterUser){
+  if(personLabel && personLabel !== 'All Staff'){
     doc.text(`Name: ${personLabel}   |   PIN: ${pinLabel}   |   Designation: ${desigLabel}   |   Total Records: ${data.length}`,14,25);
   } else {
     doc.text(`All Staff   |   Total Records: ${data.length}`,14,25);
