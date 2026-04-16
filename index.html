@@ -135,6 +135,7 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
 
 /* PRINT */
 @media print{
+  @page { size: A4 landscape; margin: 10mm; }
   .auth-outer,.topbar,.nav-tabs,.action-row,.report-filters,.btn-action,.btn-filter,.loading-overlay{display:none!important;}
   body{background:#fff;}
   .table-wrap{box-shadow:none;}
@@ -469,11 +470,11 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
         <table>
           <thead><tr>
             <th>#</th><th>Date</th><th>Name</th><th>PIN</th>
-            <th class="num">🌅 Bfast</th>
-            <th class="num">🥐 M.Snacks</th>
-            <th class="num">🍱 Lunch</th>
-            <th class="num">🍵 E.Snacks</th>
-            <th class="num">🍽️ Dinner</th>
+            <th class="num" id="rh-breakfast"></th>
+            <th class="num" id="rh-msnacks"></th>
+            <th class="num" id="rh-lunch"></th>
+            <th class="num" id="rh-esnacks"></th>
+            <th class="num" id="rh-dinner"></th>
             <th class="num">Total</th>
             <th class="num">Amount (৳)</th>
           </tr></thead>
@@ -532,7 +533,7 @@ const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyYSUuRnN6hycIcr5nvDf
 const STAFF_CODE = 'BLC@2024';
 const ADMIN_CODE = 'BLCADMIN@2024';
 
-const MEAL_RATES={breakfast:40,msnacks:0,lunch:80,esnacks:0,dinner:80};
+const MEAL_RATES={breakfast:50,msnacks:0,lunch:90,esnacks:0,dinner:90};
 function calcAmount(r){return (r.breakfast||0)*MEAL_RATES.breakfast+(r.msnacks||0)*MEAL_RATES.msnacks+(r.lunch||0)*MEAL_RATES.lunch+(r.esnacks||0)*MEAL_RATES.esnacks+(r.dinner||0)*MEAL_RATES.dinner;}
 function realTotal(r){return (r.breakfast||0)+(r.msnacks||0)+(r.lunch||0)+(r.esnacks||0)+(r.dinner||0);}
 let records=[], users=[], counts={breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0}, me=null;
@@ -1133,8 +1134,39 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 
 // REPORT
+// Populate report table headers with same images as Meal Entry
+function initReportHeaders(){
+  const meals = [
+    {id:'rh-breakfast', mealItem:'breakfast', label:'Bfast'},
+    {id:'rh-msnacks',   mealItem:'msnacks',   label:'M.Snacks'},
+    {id:'rh-lunch',     mealItem:'lunch',      label:'Lunch'},
+    {id:'rh-esnacks',   mealItem:'esnacks',    label:'E.Snacks'},
+    {id:'rh-dinner',    mealItem:'dinner',     label:'Dinner'}
+  ];
+  meals.forEach(m=>{
+    const th = document.getElementById(m.id);
+    if(!th) return;
+    // Find the meal-icon img in the meal entry grid
+    const counterEl = document.getElementById('val-'+m.mealItem);
+    if(counterEl){
+      const mealItem = counterEl.closest('.meal-item');
+      if(mealItem){
+        const img = mealItem.querySelector('.meal-icon img');
+        if(img){
+          th.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;"><img src="${img.src}" style="width:28px;height:28px;object-fit:cover;border-radius:6px;"/><span style="font-size:10px;">${m.label}</span></div>`;
+          return;
+        }
+      }
+    }
+    // Fallback to text
+    th.textContent = m.label;
+  });
+}
+
 function renderReport(){
   if(!me) return;
+  // Initialize report table headers with meal images
+  initReportHeaders();
   // Set default dates first (today) if not user-set
   setReportDefaultDates();
   populateFilters();
@@ -1148,14 +1180,24 @@ function renderReport(){
   const personsLabel = isAdmin ? 'Persons' : 'Entries';
   const personsIcon  = isAdmin ? '👤' : '📝';
 
+  // Helper to get meal img html for summary cards
+  function mealImgHtml(mealKey){
+    const el = document.getElementById('val-'+mealKey);
+    if(el){
+      const mi = el.closest('.meal-item');
+      if(mi){const img=mi.querySelector('.meal-icon img');if(img) return `<img src="${img.src}" style="width:32px;height:32px;object-fit:cover;border-radius:8px;"/>`;}
+    }
+    return '';
+  }
+
   document.getElementById('summaryCards').innerHTML=`
     <div class="sum-card"><div class="sum-icon">${personsIcon}</div><div><div class="sum-label">${personsLabel}</div><div class="sum-val">${data.length}</div></div></div>
     <div class="sum-card"><div class="sum-icon">🍽️</div><div><div class="sum-label">Total Meals</div><div class="sum-val">${T.total}</div></div></div>
-    <div class="sum-card"><div class="sum-icon">🌅</div><div><div class="sum-label">Breakfast</div><div class="sum-val">${T.breakfast}</div></div></div>
-    <div class="sum-card"><div class="sum-icon">🥐</div><div><div class="sum-label">M. Snacks</div><div class="sum-val">${T.msnacks}</div></div></div>
-    <div class="sum-card"><div class="sum-icon">🍱</div><div><div class="sum-label">Lunch</div><div class="sum-val">${T.lunch}</div></div></div>
-    <div class="sum-card"><div class="sum-icon">🍵</div><div><div class="sum-label">E. Snacks</div><div class="sum-val">${T.esnacks}</div></div></div>
-    <div class="sum-card"><div class="sum-icon">🍽️</div><div><div class="sum-label">Dinner</div><div class="sum-val">${T.dinner}</div></div></div>
+    <div class="sum-card"><div class="sum-icon">${mealImgHtml('breakfast')||'🌅'}</div><div><div class="sum-label">Breakfast</div><div class="sum-val">${T.breakfast}</div></div></div>
+    <div class="sum-card"><div class="sum-icon">${mealImgHtml('msnacks')||'🥐'}</div><div><div class="sum-label">M. Snacks</div><div class="sum-val">${T.msnacks}</div></div></div>
+    <div class="sum-card"><div class="sum-icon">${mealImgHtml('lunch')||'🍱'}</div><div><div class="sum-label">Lunch</div><div class="sum-val">${T.lunch}</div></div></div>
+    <div class="sum-card"><div class="sum-icon">${mealImgHtml('esnacks')||'🍵'}</div><div><div class="sum-label">E. Snacks</div><div class="sum-val">${T.esnacks}</div></div></div>
+    <div class="sum-card"><div class="sum-icon">${mealImgHtml('dinner')||'🍽️'}</div><div><div class="sum-label">Dinner</div><div class="sum-val">${T.dinner}</div></div></div>
     <div class="sum-card"><div class="sum-icon">💰</div><div><div class="sum-label">Total Amount</div><div class="sum-val" style="color:var(--orange);">৳${data.reduce((s,r)=>s+calcAmount(r),0)}</div></div></div>`;
 
   const tbody=document.getElementById('reportBody');
