@@ -135,7 +135,7 @@ td.num{font-family:'DM Mono',monospace;font-weight:600;color:var(--green2);}
 
 /* PRINT */
 @media print{
-  @page { size: A4 landscape; margin: 10mm; }
+  @page { size: A4 portrait; margin: 10mm; }
   .auth-outer,.topbar,.nav-tabs,.action-row,.report-filters,.btn-action,.btn-filter,.loading-overlay{display:none!important;}
   body{background:#fff;}
   .table-wrap{box-shadow:none;}
@@ -1365,29 +1365,29 @@ function exportPDF(){
   data.forEach(r=>{T.breakfast+=r.breakfast||0;T.msnacks+=r.msnacks||0;T.lunch+=r.lunch||0;T.esnacks+=r.esnacks||0;T.dinner+=r.dinner||0;T.total+=realTotal(r);});
 
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
 
   // Header — green background, taller to fit 3 lines
   doc.setFillColor(45,106,79);
-  doc.rect(0,0,297,28,'F');
+  doc.rect(0,0,210,28,'F');
   doc.setTextColor(255,255,255);
 
   // Line 1: Meal Report (মাঝখানে) | Date (ডান কোণায়)
-  doc.setFontSize(16);doc.setFont(undefined,'bold');
-  doc.text('Meal Report',148.5,11,{align:'center'});
-  doc.setFontSize(9);doc.setFont(undefined,'normal');
-  doc.text(`Date: ${bdDate}`,283,11,{align:'right'});
+  doc.setFontSize(14);doc.setFont(undefined,'bold');
+  doc.text('Meal Report',105,11,{align:'center'});
+  doc.setFontSize(8);doc.setFont(undefined,'normal');
+  doc.text(`Date: ${bdDate}`,196,11,{align:'right'});
 
   // Line 2: BLC Sreemangal (মাঝখানে)
-  doc.setFontSize(10);doc.setFont(undefined,'normal');
-  doc.text('BLC Sreemangal',148.5,18,{align:'center'});
+  doc.setFontSize(9);doc.setFont(undefined,'normal');
+  doc.text('BLC Sreemangal',105,18,{align:'center'});
 
   // Line 3: Name | PIN | Designation (বাম পাশে)
-  doc.setFontSize(8.5);
+  doc.setFontSize(7.5);
   if(personLabel && personLabel !== 'All Staff'){
-    doc.text(`Name: ${personLabel}   |   PIN: ${pinLabel}   |   Designation: ${desigLabel}   |   Total Records: ${data.length}`,14,25);
+    doc.text(`Name: ${personLabel}   |   PIN: ${pinLabel}   |   Designation: ${desigLabel}   |   Records: ${data.length}`,10,25);
   } else {
-    doc.text(`All Staff   |   Total Records: ${data.length}`,14,25);
+    doc.text(`All Staff   |   Total Records: ${data.length}`,10,25);
   }
 
   const totalAmount = data.reduce((s,r)=>s+calcAmount(r),0);
@@ -1405,9 +1405,9 @@ function exportPDF(){
       ]),
       ['','','TOTAL','',T.breakfast,T.msnacks,T.lunch,T.esnacks,T.dinner,T.total,data.reduce((s,r)=>s+calcAmount(r),0)]
     ],
-    headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:9},
-    bodyStyles:{fontSize:8},
-    columnStyles:{0:{cellWidth:8},1:{cellWidth:22},2:{cellWidth:38},3:{cellWidth:16},4:{cellWidth:13},5:{cellWidth:13},6:{cellWidth:13},7:{cellWidth:13},8:{cellWidth:13},9:{cellWidth:13},10:{cellWidth:18}},
+    headStyles:{fillColor:[45,106,79],textColor:255,fontStyle:'bold',fontSize:8},
+    bodyStyles:{fontSize:7.5},
+    columnStyles:{0:{cellWidth:6},1:{cellWidth:18},2:{cellWidth:32},3:{cellWidth:14},4:{cellWidth:12},5:{cellWidth:12},6:{cellWidth:12},7:{cellWidth:12},8:{cellWidth:12},9:{cellWidth:12},10:{cellWidth:16}},
     alternateRowStyles:{fillColor:[216,243,220]},
     didParseCell:function(d){
       if(d.row.index===data.length){
@@ -1416,7 +1416,7 @@ function exportPDF(){
         d.cell.styles.textColor=255;
       }
     },
-    margin:{left:14,right:14}
+    margin:{left:10,right:10}
   });
 
   doc.save(`BLC_Meals_${personLabel.replace(/ /g,'_')}_${bdDate}.pdf`);
