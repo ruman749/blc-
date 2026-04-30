@@ -1541,32 +1541,63 @@ function exportMonthlySummaryExcel(persons, monthLabel, bfRate, ldRate, month, y
   const regularPersons = persons.filter(p => !BLC_SPECIAL_STAFF.some(n => p.name.trim().toLowerCase() === n.toLowerCase()));
 
   function buildStaffSheet(pList, sheetLabel){
+    // Columns: A=SL No, B=Name, C=Designation, D=PIN,
+    //          E=Total Meal Breakfast, F=Total Meal Lunch+Dinner,
+    //          G=Breakfast Amount, H=Lunch+Dinner Amount, I=Total Amount
+    // Row 1 blank, Row 2 = BRAC Learning Centre (D2), Row 3 = Sreemangal (D3)
+    // Row 4 blank, Row 5 = Summary Report, Row 6 = Month-
+    // Row 7 blank
+    // Row 8 = headers (SL No, Name, Designation, PIN, Total Meal[merged E8:F8], blank, Breakfast Amount, Lunch+Dinner Amount, Total Amount)
+    // Row 9 = sub-headers (blank x4, Breakfast, Lunch+Dinner, blank, blank, blank)
     const aoa = [
-      [],
-      ['', '', '', 'BRAC Learning Centre'],
-      ['', '', '', 'Sreemangal'],
-      [],
-      [sheetLabel],
-      ['Month- ' + monthLabel],
-      [],
-      ['SL No', 'Name', 'Designation', 'PIN', 'Total Meal', '', 'Meal Rate', '', 'Total Amount', 'Grand Amount', 'Date of Bill pay', 'Nagad Rashid No'],
-      ['', '', '', '', 'Breakfast', 'Lunch+Dinner', 'Breakfast', 'Lunch+Dinner', '', '', '', '']
+      [],                                                              // row 0 (row 1)
+      ['', '', '', 'BRAC Learning Centre'],                           // row 1 (row 2)
+      ['', '', '', 'Sreemangal'],                                     // row 2 (row 3)
+      [],                                                              // row 3 (row 4)
+      [sheetLabel],                                                    // row 4 (row 5)
+      ['Month- ' + monthLabel],                                        // row 5 (row 6)
+      [],                                                              // row 6 (row 7)
+      // row 7 (row 8) — main header
+      ['SL No','Name','Designation','PIN','Total Meal','','Breakfast Amount','Lunch+Dinner Amount','Total Amount'],
+      // row 8 (row 9) — sub-header
+      ['','','','','Breakfast','Lunch+Dinner','','','']
     ];
-    let gtBf=0,gtLd=0,gtBfAmt=0,gtLdAmt=0,gtGrand=0;
+
+    let gtBf=0,gtLd=0,gtBfAmt=0,gtLdAmt=0,gtTotal=0;
     pList.forEach((p,i)=>{
       const bfQty = p.breakfast;
-      const ldQty = p.lunch + p.dinner + p.msnacks + p.esnacks;
+      const ldQty = p.lunch + p.dinner; // only lunch+dinner, exclude snacks
       const bfAmt = parseFloat((bfQty * bfRate).toFixed(2));
       const ldAmt = parseFloat((ldQty * ldRate).toFixed(2));
-      const grand = bfAmt + ldAmt;
-      gtBf+=bfQty; gtLd+=ldQty; gtBfAmt+=bfAmt; gtLdAmt+=ldAmt; gtGrand+=grand;
-      aoa.push([i+1, p.name, p.designation, p.pin, bfQty, ldQty, bfRate, ldRate, parseFloat((bfAmt+ldAmt).toFixed(2)), grand, '', '']);
+      const total = parseFloat((bfAmt + ldAmt).toFixed(2));
+      gtBf+=bfQty; gtLd+=ldQty; gtBfAmt+=bfAmt; gtLdAmt+=ldAmt; gtTotal+=total;
+      aoa.push([i+1, p.name, p.designation, p.pin, bfQty, ldQty, bfAmt, ldAmt, total]);
     });
     aoa.push([]);
-    aoa.push(['','','','Total', gtBf, gtLd,'','', parseFloat((gtBfAmt+gtLdAmt).toFixed(2)), parseFloat(gtGrand.toFixed(2)),'','']);
+    aoa.push(['','','','Total', gtBf, gtLd, parseFloat(gtBfAmt.toFixed(2)), parseFloat(gtLdAmt.toFixed(2)), parseFloat(gtTotal.toFixed(2))]);
+
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols']=[{wch:7},{wch:28},{wch:20},{wch:12},{wch:12},{wch:14},{wch:12},{wch:14},{wch:14},{wch:14},{wch:22},{wch:16}];
-    ws['!merges']=[{s:{r:1,c:3},e:{r:1,c:7}},{s:{r:2,c:3},e:{r:2,c:7}}];
+    ws['!cols']=[{wch:7},{wch:28},{wch:24},{wch:12},{wch:12},{wch:16},{wch:18},{wch:20},{wch:14}];
+
+    // Merges:
+    // BRAC Learning Centre: D2:I2 => r1,c3 to r1,c8
+    // Sreemangal:           D3:I3 => r2,c3 to r2,c8
+    // Total Meal header:    E8:F8 => r7,c4 to r7,c5
+    // Breakfast Amount header: G8 rowSpan 2 => handled by empty row 9
+    // Lunch+Dinner Amount header: H8 rowSpan 2
+    // Total Amount header:  I8 rowSpan 2
+    ws['!merges']=[
+      {s:{r:1,c:3},e:{r:1,c:8}},   // BRAC Learning Centre
+      {s:{r:2,c:3},e:{r:2,c:8}},   // Sreemangal
+      {s:{r:7,c:4},e:{r:7,c:5}},   // Total Meal (merged E8:F8)
+      {s:{r:7,c:0},e:{r:8,c:0}},   // SL No rowspan
+      {s:{r:7,c:1},e:{r:8,c:1}},   // Name rowspan
+      {s:{r:7,c:2},e:{r:8,c:2}},   // Designation rowspan
+      {s:{r:7,c:3},e:{r:8,c:3}},   // PIN rowspan
+      {s:{r:7,c:6},e:{r:8,c:6}},   // Breakfast Amount rowspan
+      {s:{r:7,c:7},e:{r:8,c:7}},   // Lunch+Dinner Amount rowspan
+      {s:{r:7,c:8},e:{r:8,c:8}},   // Total Amount rowspan
+    ];
     return ws;
   }
 
@@ -1588,6 +1619,9 @@ function exportMonthlySummaryExcel(persons, monthLabel, bfRate, ldRate, month, y
     return {name:sName, pin:u?u.pin||'—':'—', designation:u?u.designation||'—':'—', breakfast:0,msnacks:0,lunch:0,esnacks:0,dinner:0,total:0};
   });
 
+  // Cols: A=SL, B=Name, C=Desig, D=PIN,
+  //        E=Bf Count, F=Bf Amt, G=Lunch Count, H=Lunch Amt,
+  //        I=Dinner Count, J=Dinner Amt, K=Total Meal, L=Rate, M=Total Amount
   const aoaS = [
     [],
     ['', '', '', 'BRAC Learning Centre'],
@@ -1595,31 +1629,44 @@ function exportMonthlySummaryExcel(persons, monthLabel, bfRate, ldRate, month, y
     [],
     ['BLC Staff Special Report'],
     ['Month- ' + monthLabel],
-    ['Rate Calculation: ' + rateFormula],
+    ['Rate: 1000 ÷ ' + days + ' days ÷ 2.5 = ৳' + specialRateDisplay + '/meal'],
     [],
-    ['SL No','Name','Designation','PIN','Breakfast','','Lunch','','Dinner','','Total Meal','Rate (৳)','Total Amount','Grand Amount','Date of Bill pay','Nagad Rashid No'],
-    ['','','','','Count','Amount (৳)','Count','Amount (৳)','Count','Amount (৳)','','','','','','']
+    ['SL No','Name','Designation','PIN','Breakfast','','Lunch','','Dinner','','Total Meal','Rate (৳)','Total Amount'],
+    ['','','','','Count','Amount','Count','Amount','Count','Amount','','','']
   ];
 
-  let gtBf=0,gtLunch=0,gtDinner=0,gtGrand=0;
+  let sGtBf=0,sGtLc=0,sGtDn=0,sGtTotal=0;
   allSpecial.forEach((p,i)=>{
     const bf  = p.breakfast;
-    const lc  = p.lunch + (p.msnacks||0);
-    const dn  = p.dinner + (p.esnacks||0);
+    const lc  = p.lunch; // lunch only
+    const dn  = p.dinner; // dinner only
     const tot = bf + lc + dn;
-    const bfAmt = parseFloat((bf * specialRate).toFixed(2));
-    const lcAmt = parseFloat((lc * specialRate).toFixed(2));
-    const dnAmt = parseFloat((dn * specialRate).toFixed(2));
-    const grand = parseFloat((tot * specialRate).toFixed(2));
-    gtBf+=bf; gtLunch+=lc; gtDinner+=dn; gtGrand+=grand;
-    aoaS.push([i+1, p.name, p.designation, p.pin, bf, bfAmt, lc, lcAmt, dn, dnAmt, tot, specialRateDisplay, grand, grand, '', '']);
+    const bfAmt  = parseFloat((bf * specialRate).toFixed(2));
+    const lcAmt  = parseFloat((lc * specialRate).toFixed(2));
+    const dnAmt  = parseFloat((dn * specialRate).toFixed(2));
+    const totAmt = parseFloat((tot * specialRate).toFixed(2));
+    sGtBf+=bf; sGtLc+=lc; sGtDn+=dn; sGtTotal+=totAmt;
+    aoaS.push([i+1, p.name, p.designation, p.pin, bf, bfAmt, lc, lcAmt, dn, dnAmt, tot, specialRateDisplay, totAmt]);
   });
   aoaS.push([]);
-  aoaS.push(['','','','Total', gtBf,'', gtLunch,'', gtDinner,'', gtBf+gtLunch+gtDinner,'', parseFloat(gtGrand.toFixed(2)), parseFloat(gtGrand.toFixed(2)),'','']);
+  aoaS.push(['','','','Total', sGtBf,'', sGtLc,'', sGtDn,'', sGtBf+sGtLc+sGtDn,'', parseFloat(sGtTotal.toFixed(2))]);
 
   const wsS = XLSX.utils.aoa_to_sheet(aoaS);
-  wsS['!cols']=[{wch:6},{wch:26},{wch:18},{wch:12},{wch:9},{wch:13},{wch:9},{wch:13},{wch:9},{wch:13},{wch:11},{wch:11},{wch:14},{wch:14},{wch:20},{wch:16}];
-  wsS['!merges']=[{s:{r:1,c:3},e:{r:1,c:7}},{s:{r:2,c:3},e:{r:2,c:7}}];
+  wsS['!cols']=[{wch:6},{wch:26},{wch:22},{wch:12},{wch:9},{wch:13},{wch:9},{wch:13},{wch:9},{wch:13},{wch:11},{wch:11},{wch:14}];
+  wsS['!merges']=[
+    {s:{r:1,c:3},e:{r:1,c:9}},  // BRAC Learning Centre
+    {s:{r:2,c:3},e:{r:2,c:9}},  // Sreemangal
+    {s:{r:8,c:4},e:{r:8,c:5}},  // Breakfast merged header
+    {s:{r:8,c:6},e:{r:8,c:7}},  // Lunch merged header
+    {s:{r:8,c:8},e:{r:8,c:9}},  // Dinner merged header
+    {s:{r:8,c:0},e:{r:9,c:0}},  // SL No rowspan
+    {s:{r:8,c:1},e:{r:9,c:1}},  // Name rowspan
+    {s:{r:8,c:2},e:{r:9,c:2}},  // Designation rowspan
+    {s:{r:8,c:3},e:{r:9,c:3}},  // PIN rowspan
+    {s:{r:8,c:10},e:{r:9,c:10}},// Total Meal rowspan
+    {s:{r:8,c:11},e:{r:9,c:11}},// Rate rowspan
+    {s:{r:8,c:12},e:{r:9,c:12}},// Total Amount rowspan
+  ];
   XLSX.utils.book_append_sheet(wb, wsS, 'BLC Special Staff');
 
   XLSX.writeFile(wb, `BLC_Monthly_Summary_${monthLabel.replace(/ /g,'_')}.xlsx`);
@@ -1661,7 +1708,7 @@ function exportMonthlySummaryPDF(persons, monthLabel, bfRate, ldRate, month, yea
   const regBody=[];
   let gtBf=0,gtLd=0,gtAmt=0;
   regularPersons.forEach((p,i)=>{
-    const bfQty=p.breakfast, ldQty=p.lunch+p.dinner+p.msnacks+p.esnacks;
+    const bfQty=p.breakfast, ldQty=p.lunch+p.dinner; // lunch+dinner only
     const bfAmt=parseFloat((bfQty*bfRate).toFixed(2)), ldAmt=parseFloat((ldQty*ldRate).toFixed(2));
     const grand=bfAmt+ldAmt;
     gtBf+=bfQty;gtLd+=ldQty;gtAmt+=grand;
@@ -1695,7 +1742,7 @@ function exportMonthlySummaryPDF(persons, monthLabel, bfRate, ldRate, month, yea
   const spBody=[];
   let sGtBf=0,sGtLc=0,sGtDn=0,sGtGrand=0;
   allSpecial.forEach((p,i)=>{
-    const bf=p.breakfast, lc=p.lunch+(p.msnacks||0), dn=p.dinner+(p.esnacks||0), tot=bf+lc+dn;
+    const bf=p.breakfast, lc=p.lunch, dn=p.dinner, tot=bf+lc+dn; // pure lunch/dinner only
     const bfAmt=parseFloat((bf*specialRate).toFixed(2));
     const lcAmt=parseFloat((lc*specialRate).toFixed(2));
     const dnAmt=parseFloat((dn*specialRate).toFixed(2));
